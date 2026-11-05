@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
+Thumbs.db
+.chrome-*/
+.edge-*/
+*-test.png
+data/tracts/.*.ndjson
+
+# Large full-column source CSVs: not used by the live site (it loads the
+# slim *.min.csv files). Rebuild with scripts/prepare_web_data.py.
+data/census-tracts.csv
+data/schools-enhanced.csv
+data/child-crashes.csv
+
