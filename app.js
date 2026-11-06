@@ -857,6 +857,7 @@ function makeTractPopup(feature) {
     ["Child fatalities", formatValue(properties.child_deaths, "child_deaths")],
     ["Child pedestrian / cyclist deaths", formatValue(properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
     ["Crashes per 10,000 children", formatValue(properties.child_crash_rate, "child_crash_rate")],
+    ["Street View indicators", properties.sidewalk_tertile === null || properties.sidewalk_tertile === undefined ? "No data (no Street View images)" : "Available"],
   ]);
 }
 
@@ -1535,10 +1536,10 @@ async function loadCountyData() {
   }).addTo(map);
 }
 
-// County values for the tract tab come from the manuscript's tract sample, so the
-// national county view matches the tract layer and the summary totals. Rates are
-// county deaths per 10,000 children in the sampled tracts; tertiles are the mean
-// tract tertile. Counties with no sampled tracts stay gray ("No analysis data").
+// County values for the tract tab sum every tract, including tracts without Street
+// View data (their crashes are real), so the national county view matches the tract
+// layer and the summary totals. Rates are county counts per 10,000 children;
+// tertiles are the mean tract tertile over tracts that have Street View data.
 function applyTractSampleToCounties() {
   const totals = new Map();
   tractDataById.forEach((tract, geoid) => {

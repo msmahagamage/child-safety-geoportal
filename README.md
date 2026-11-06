@@ -11,7 +11,7 @@ It is a static website (HTML, CSS, JavaScript and data files).
 Pick a layer in the left panel. Each layer has its own State and County filters and its own map measure; switching layers resets the previous layer's choices.
 
 - **Crash density** – hexagons of child-involved fatal crashes, with year and child age-group filters.
-- **Census tracts** – 2019 tract choropleths that load by state when you zoom in. Measures: counts, rates per 10,000 children, and Street View built-environment tertiles. Gray tracts have no analysis data (they are not zero).
+- **Census tracts** – 2019 tract choropleths that load by state when you zoom in. Measures: counts, rates per 10,000 children, and Street View built-environment tertiles. Crash counts cover all 73,868 tracts. Tracts without Street View images (4,748) still show their crashes; only the built-environment tertile layers are gray ("no data") there. Gray never means zero.
 - **Road corridors** – all road classes (TIGER/Line), colored by child-involved fatal crashes, crashes per road mile, child fatalities, or child pedestrian/cyclist deaths.
 - **School buffers** – clustered national school circles; zoom in for individual schools with the two-mile buffer, filtered-area comparisons, and optional overlays:
   - *Crashes assigned to this school*: black-outlined dots, filled pale orange/orange / dark red for 0 / 1 / 2+ child deaths in the crash.
@@ -34,7 +34,7 @@ Then open <http://localhost:8765>. On Windows you can double-click `start-server
 
 | File | Contents |
 |---|---|
-| `tracts.csv` | 69,120 tracts: counts, rates per 10,000 children, five Street View tertiles, `child_total` |
+| `tracts.csv` | All 73,868 tracts: counts, rates per 10,000 children, five Street View tertiles, `child_total` |
 | `crashes.csv` | 37,412 child-involved fatal crashes with a valid location, plus `school_id` (nearest school within 2 miles) |
 | `schools.csv` | 76,056 schools, with indicators and study outcomes |
 | `roads.geojson` | TIGER/Line road corridors with matched crash outcomes (44,996 corridors) |
