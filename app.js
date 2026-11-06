@@ -304,7 +304,6 @@ function makeTractRecords(rows) {
         stopsign_tertile: numberOrNull(row.tertstopsign),
         greenness_tertile: numberOrNull(row.tertgreen),
         children: numberOrZero(row.child_total),
-        in_sample: row.in_sample === "1",
       },
       geometry: null,
     };
@@ -859,7 +858,6 @@ function makeTractPopup(feature) {
     ["Child fatalities", formatValue(properties.child_deaths, "child_deaths")],
     ["Child pedestrian / cyclist deaths", formatValue(properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
     ["Crashes per 10,000 children", formatValue(properties.child_crash_rate, "child_crash_rate")],
-    ["In manuscript regression sample", properties.in_sample ? "Yes" : "No (e.g. missing traffic-volume data)"],
   ]);
 }
 

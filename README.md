@@ -34,7 +34,7 @@ Then open <http://localhost:8765>. On Windows you can double-click `start-server
 
 | File | Contents |
 |---|---|
-| `tracts.csv` | 69,120 tracts: counts, rates per 10,000 children, five Street View tertiles, `child_total`, `in_sample` flag |
+| `tracts.csv` | 69,120 tracts: counts, rates per 10,000 children, five Street View tertiles, `child_total` |
 | `crashes.csv` | 37,412 child-involved fatal crashes with a valid location, plus `school_id` (nearest school within 2 miles) |
 | `schools.csv` | 76,056 schools in the manuscript sample, with indicators and study outcomes |
 | `roads.geojson` | TIGER/Line road corridors with matched crash outcomes (44,996 corridors) |
@@ -46,7 +46,7 @@ See `data/README.md` for details.
 
 ## How the data match the manuscript
 
-- **Tracts.** The map shows the 69,120 tracts of `cetract_standardized.csv` (the dataframe behind the manuscript's Figure 2). Each popup states whether the tract is in the final regression sample of Tables 1–2: 63,565 tracts with complete covariates, 34,446 fatal collisions, 13,979 child fatalities and 2,274 child pedestrian / cyclist fatalities.
+- **Tracts.** The map shows the 69,120 tracts of `cetract_standardized.csv` (the dataframe behind the manuscript's Figure 2). The manuscript regression (Tables 1–2) used 63,565 of these tracts (those with children and complete covariates, including traffic volume): 34,446 fatal collisions, 13,979 child fatalities and 2,274 child pedestrian / cyclist fatalities. The map shows all 69,120, so its totals are slightly higher.
 - **Schools.** Exactly the manuscript's school sample: public schools with a stable location, Street View indicators, a 2019 tract with complete covariates, and 2023 enrollment of at least 25 (76,058 rows, 76,056 unique IDs).
 - **Crash assignment.** Each fatal child-involved crash belongs to its single nearest school within two miles. A crash inside a school's circle that is nearer to another school is not shown for it. The manuscript's printed school totals (19,830 crashes, 7,500 child deaths, 1,701 child pedestrian / cyclist deaths) are computed before the enrollment filter, so school popups can differ slightly.
 - **Definitions.** A child is under 18. A child fatality is a child with FARS injury severity 4. A child pedestrian / cyclist death is a child death with person type 5 or 6. "Fatal collisions with children" counts crashes, so one crash can involve several children and a child may survive in a crash that killed an adult.

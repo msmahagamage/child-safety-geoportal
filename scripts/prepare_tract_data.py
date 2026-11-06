@@ -8,7 +8,7 @@ Source: the manuscript's saved tract dataframes in child_collisions_gsv_code_and
   (writing/figure_2.png, saved 2026-01-29). The atlas maps exactly these tracts, with
   the outcome counts and Street View tertiles stored in that file.
 * cetract_raw.csv (2026-04-16) is the final regression dataframe (63,565 tracts with
-  children > 0, adds the traffic-volume covariate). Its tracts are flagged in_sample = 1.
+  children > 0, adds the traffic-volume covariate). (Used only to verify the manuscript totals.)
 
 Rates are per 10,000 children, using the 2019 ACS under-18 population (the notebook's
 child_total; identical to cetract_raw.csv's child_total for every sample tract).
@@ -52,13 +52,13 @@ def main() -> None:
     acs["child_total"] = acs[CHILD_COLUMNS].sum(axis=1)
 
     tracts = figure[["GEOID"] + OUTCOMES + TERTILES].merge(acs[["GEOID", "child_total"]], on="GEOID", how="left")
-    tracts["in_sample"] = tracts.GEOID.isin(set(sample.GEOID)).astype(int)
+    in_sample_mask = tracts.GEOID.isin(set(sample.GEOID))  # check only; not written to the web file
     assert set(sample.GEOID) <= set(tracts.GEOID), "sample tracts must be a subset of the Figure 2 tracts"
     for column in OUTCOMES:
         tracts[column] = tracts[column].astype(int)
         tracts[column + "_p10k"] = (tracts[column] / tracts.child_total * 10000).where(tracts.child_total > 0)
 
-    columns = ["GEOID"] + OUTCOMES + [c + "_p10k" for c in OUTCOMES] + TERTILES + ["child_total", "in_sample"]
+    columns = ["GEOID"] + OUTCOMES + [c + "_p10k" for c in OUTCOMES] + TERTILES + ["child_total"]
     tracts = tracts[columns].sort_values("GEOID")
     for column in TERTILES + ["child_total"]:
         tracts[column] = tracts[column].round().astype("Int64")
@@ -66,7 +66,7 @@ def main() -> None:
         tracts[column] = tracts[column].map(lambda v: "" if pd.isna(v) else f"{v:.5g}")
     tracts.to_csv(OUTPUT, index=False, lineterminator="\n")
 
-    in_sample = tracts[tracts.in_sample == 1]
+    in_sample = tracts[in_sample_mask.reindex(tracts.index, fill_value=False)]
     print(f"{len(tracts):,} tracts mapped (Figure 2 dataframe); {len(in_sample):,} in the regression sample")
     print("regression sample totals:", in_sample[OUTCOMES].sum().to_dict(), "(manuscript 34,446 / 13,979 / 2,274)")
     print("all mapped totals:", tracts[OUTCOMES].sum().to_dict())
