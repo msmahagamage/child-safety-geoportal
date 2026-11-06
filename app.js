@@ -6,7 +6,7 @@ const layerSettings = {
     label: "crash map cells",
   },
   tracts: {
-    title: "Fatal crashes by census tract",
+    title: "Child-involved fatal crashes by census tract",
     description: "Counties provide national context; zoom in to see filled census tract boundaries.",
     label: "census tracts",
   },
@@ -23,13 +23,13 @@ const layerSettings = {
 };
 
 const measureSettings = {
-  child_crashes: { label: "Child-involved fatal crashes", legend: "Fatal crashes", scale: "count" },
+  child_crashes: { label: "Child-involved fatal crashes", legend: "Child-involved fatal crashes", scale: "count" },
   child_deaths: { label: "Child fatalities", legend: "Child fatalities", scale: "count" },
-  ped_cyclist_deaths: { label: "Pedestrian / cyclist deaths", legend: "Pedestrian / cyclist deaths", scale: "count" },
-  crashes_per_mile: { label: "Fatal crashes per road mile", legend: "Crashes per road mile", scale: "rate" },
-  child_crash_rate: { label: "Fatal crashes per 10,000 children", legend: "Crashes per 10,000", scale: "rate" },
-  child_death_rate: { label: "Fatalities per 10,000 children", legend: "Fatalities per 10,000", scale: "rate" },
-  ped_cyclist_death_rate: { label: "Pedestrian / cyclist deaths per 10,000", legend: "Pedestrian / cyclist rate", scale: "rate" },
+  ped_cyclist_deaths: { label: "Child pedestrian / cyclist deaths", legend: "Child pedestrian / cyclist deaths", scale: "count" },
+  crashes_per_mile: { label: "Child-involved fatal crashes per road mile", legend: "Child-involved crashes per road mile", scale: "rate" },
+  child_crash_rate: { label: "Child-involved fatal crashes per 10,000 children", legend: "Child-involved crashes per 10,000 children", scale: "rate" },
+  child_death_rate: { label: "Child fatalities per 10,000 children", legend: "Child fatalities per 10,000 children", scale: "rate" },
+  ped_cyclist_death_rate: { label: "Child pedestrian / cyclist deaths per 10,000 children", legend: "Child ped. / cyclist deaths per 10,000 children", scale: "rate" },
   sidewalk_tertile: { label: "Sidewalk prevalence tertile", legend: "Sidewalk tertile", scale: "tertile" },
   single_lane_tertile: { label: "Single-lane road tertile", legend: "Single-lane tertile", scale: "tertile" },
   greenness_tertile: { label: "Street greenness tertile", legend: "Greenness tertile", scale: "tertile" },
@@ -596,7 +596,7 @@ async function refreshSchoolContextOverlays() {
       }).bindPopup(() => popupContent(`Crash ${feature.properties.crash_id}`, [
         ["Year", feature.properties.year],
         ["Child fatalities", feature.properties.child_deaths],
-        ["Pedestrian / cyclist deaths", feature.properties.ped_cyclist_deaths],
+        ["Child pedestrian / cyclist deaths", feature.properties.ped_cyclist_deaths],
       ]));
     })).addTo(map);
   }
@@ -769,9 +769,9 @@ function showSchool(feature) {
   const popup = popupContent(properties.school_name, [
     ["NCES ID", properties.ncesid_t],
     ["Study buffer", `${schoolBufferMiles} miles`],
-    ["Study fatal crashes (nearest school)", properties.study_crashes],
+    ["Study child-involved fatal crashes (nearest school)", properties.study_crashes],
     ["Study child fatalities", properties.study_child_deaths],
-    ["Study pedestrian / cyclist deaths", properties.study_ped_deaths],
+    ["Study child pedestrian / cyclist deaths", properties.study_ped_deaths],
     ["County FIPS", properties.county_fips],
     ["Address ZIP", properties.zip_code || "Not available"],
     [measureSettings[selectedMeasure].label, formatValue(selectedValue, selectedMeasure)],
@@ -793,7 +793,7 @@ function showSchool(feature) {
     const summary = document.createElement("summary");
     summary.textContent = "National 2-mile regression";
     details.append(summary);
-    const outcomeLabels = ["Fatal crashes", "Child fatalities", "Pedestrian / cyclist fatalities"];
+    const outcomeLabels = ["Child-involved fatal crashes", "Child fatalities", "Child pedestrian / cyclist fatalities"];
     regression.forEach(([irr, lower, upper], index) => {
       const result = document.createElement("p");
       result.textContent = `${outcomeLabels[index]}: IRR ${irr.toFixed(2)} (${lower.toFixed(2)}–${upper.toFixed(2)})`;
@@ -822,7 +822,7 @@ map.on("click", (event) => {
       ["Crash locations", bin.records.toLocaleString()],
       ["Child-involved fatal crashes", (bin.values.child_crashes || 0).toLocaleString()],
       ["Child fatalities", (bin.values.child_deaths || 0).toLocaleString()],
-      ["Pedestrian / cyclist deaths", (bin.values.ped_cyclist_deaths || 0).toLocaleString()],
+      ["Child pedestrian / cyclist deaths", (bin.values.ped_cyclist_deaths || 0).toLocaleString()],
     ]);
     L.popup().setLatLng(event.latlng).setContent(popup).openOn(map);
     return;
@@ -857,7 +857,7 @@ function makeTractPopup(feature) {
     ["GEOID", properties.geoid],
     ["Child-involved fatal crashes", formatValue(properties.child_crashes, "child_crashes")],
     ["Child fatalities", formatValue(properties.child_deaths, "child_deaths")],
-    ["Pedestrian / cyclist deaths", formatValue(properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
+    ["Child pedestrian / cyclist deaths", formatValue(properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
     ["Crashes per 10,000 children", formatValue(properties.child_crash_rate, "child_crash_rate")],
     ["In manuscript regression sample", properties.in_sample ? "Yes" : "No (e.g. missing traffic-volume data)"],
   ]);
@@ -971,10 +971,10 @@ function makeRoadPopup(feature) {
   return popupContent(properties.name || "Unnamed road", [
     ["Road class", roadClassNames[properties.road_class] || properties.road_class || "Road"],
     ["Segment length", `${Number(properties.length_miles || 0).toFixed(1)} miles`],
-    ["Matched fatal crashes", formatValue(properties.child_crashes, "child_crashes")],
+    ["Matched child-involved fatal crashes", formatValue(properties.child_crashes, "child_crashes")],
     ["Crashes per road mile", formatValue(properties.crashes_per_mile, "crashes_per_mile")],
     ["Child fatalities", formatValue(properties.child_deaths, "child_deaths")],
-    ["Pedestrian / cyclist deaths", formatValue(properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
+    ["Child pedestrian / cyclist deaths", formatValue(properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
   ]);
 }
 
@@ -1308,7 +1308,7 @@ function syncCountyDisplay() {
   if (showAlbersOverview) {
     renderNationalOverview();
     document.getElementById("map-title").textContent = selectedLayer === "tracts"
-      ? "Fatal crashes by county · select a county"
+      ? "Child-involved fatal crashes by county · select a county"
       : layerSettings[selectedLayer].title;
     let overviewCountText;
     if (selectedLayer === "tracts") {
@@ -1340,12 +1340,12 @@ function syncCountyDisplay() {
   if (showCountyFill) {
     countyFillLayer.setStyle(countyStyle);
     if (!map.hasLayer(countyFillLayer)) countyFillLayer.addTo(map);
-    document.getElementById("map-title").textContent = "Fatal crashes by county · zoom in for tracts";
+    document.getElementById("map-title").textContent = "Child-involved fatal crashes by county · zoom in for tracts";
     document.getElementById("feature-count").textContent = "County overview · zoom in for census tracts";
   } else {
     if (map.hasLayer(countyFillLayer)) map.removeLayer(countyFillLayer);
     if (selectedLayer === "tracts") document.getElementById("map-title").textContent = showAlbersOverview
-      ? "Fatal crashes by county · select a county"
+      ? "Child-involved fatal crashes by county · select a county"
       : layerSettings.tracts.title;
   }
   if (!map.hasLayer(countyOutlineLayer)) countyOutlineLayer.addTo(map);
@@ -1393,7 +1393,7 @@ function updateSummary(features) {
     ? ["matched to roads", "matched to roads", "matched to roads"]
     : ["mapped records", "mapped records", "child deaths"];
   setSummary(
-    ["Child-involved crashes", "Child fatalities", "Pedestrian / cyclist"],
+    ["Child-involved crashes", "Child fatalities", "Child pedestrian / cyclist"],
     [totals.child_crashes.toLocaleString(), totals.child_deaths.toLocaleString(), totals.ped_cyclist_deaths.toLocaleString()],
     units,
   );
@@ -1529,7 +1529,7 @@ async function loadCountyData() {
       ["County FIPS", feature.properties.county_fips],
       ["Child-involved fatal crashes", formatValue(feature.properties.child_crashes, "child_crashes")],
       ["Child fatalities", formatValue(feature.properties.child_deaths, "child_deaths")],
-      ["Pedestrian / cyclist deaths", formatValue(feature.properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
+      ["Child pedestrian / cyclist deaths", formatValue(feature.properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
     ])),
   });
   countyOutlineLayer = L.geoJSON(collection, {
