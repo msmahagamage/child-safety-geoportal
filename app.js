@@ -11,9 +11,9 @@ const layerSettings = {
     label: "census tracts",
   },
   roads: {
-    title: "High-crash major-road corridors",
-    description: "Primary-road segments are colored by their matched child-involved fatal-crash burden.",
-    label: "major-road segments",
+    title: "High-crash road corridors",
+    description: "Roads are colored by their matched child-involved fatal-crash burden (all road classes where available).",
+    label: "road corridors",
   },
   schools: {
     title: "Built environment around schools",
@@ -34,6 +34,7 @@ const measureSettings = {
   single_lane_tertile: { label: "Single-lane road tertile", legend: "Single-lane tertile", scale: "tertile" },
   greenness_tertile: { label: "Street greenness tertile", legend: "Greenness tertile", scale: "tertile" },
   streetlight_tertile: { label: "Streetlight prevalence tertile", legend: "Streetlight tertile", scale: "tertile" },
+  stopsign_tertile: { label: "Stop-sign prevalence tertile", legend: "Stop-sign tertile", scale: "tertile" },
   prop_sidewalk: { label: "Sidewalk image share", legend: "Sidewalk image share", scale: "proportion" },
   prop_single_lane: { label: "Single-lane road image share", legend: "Single-lane image share", scale: "proportion" },
   avg_stopsign: { label: "Average stop-sign presence", legend: "Stop-sign presence", scale: "proportion" },
@@ -46,7 +47,7 @@ const layerMeasures = {
   tracts: [
     "child_crashes", "child_deaths", "ped_cyclist_deaths",
     "child_crash_rate", "child_death_rate", "ped_cyclist_death_rate",
-    "sidewalk_tertile", "single_lane_tertile", "greenness_tertile", "streetlight_tertile",
+    "sidewalk_tertile", "single_lane_tertile", "stopsign_tertile", "greenness_tertile", "streetlight_tertile",
   ],
   roads: ["child_crashes", "crashes_per_mile", "child_deaths", "ped_cyclist_deaths"],
   schools: ["prop_sidewalk", "prop_single_lane", "avg_stopsign", "prop_green", "prop_streetlight"],
@@ -192,7 +193,7 @@ function formatValue(value, measureKey) {
   const scale = measureSettings[measureKey]?.scale;
   if (scale === "proportion") return `${(number * 100).toFixed(1)}%`;
   if (scale === "rate") return number.toFixed(1);
-  if (scale === "tertile") return `Tertile ${Math.round(number)}`;
+  if (scale === "tertile") return `Tertile ${Number.isInteger(number) ? number : number.toFixed(1)}`;
   return number.toLocaleString();
 }
 
@@ -300,7 +301,10 @@ function makeTractRecords(rows) {
         sidewalk_tertile: numberOrNull(row.tertsidewalk),
         single_lane_tertile: numberOrNull(row.tertsinglelane),
         streetlight_tertile: numberOrNull(row.tertstreetlight),
+        stopsign_tertile: numberOrNull(row.tertstopsign),
         greenness_tertile: numberOrNull(row.tertgreen),
+        children: numberOrZero(row.child_total),
+        in_sample: row.in_sample === "1",
       },
       geometry: null,
     };
@@ -329,6 +333,9 @@ function makeSchoolFeatures(rows) {
         avg_stopsign: numberOrNull(row.avg_stopsign),
         prop_green: numberOrNull(row.prop_green),
         prop_streetlight: numberOrNull(row.prop_streetlight),
+        study_crashes: numberOrZero(row.study_crashes),
+        study_child_deaths: numberOrZero(row.study_child_deaths),
+        study_ped_deaths: numberOrZero(row.study_ped_deaths),
       },
       geometry: { type: "Point", coordinates: [longitude, latitude] },
     }];
@@ -345,6 +352,7 @@ function makeCrashFeatures(rows) {
       type: "Feature",
       properties: {
         crash_id: row.crash_id,
+        school_id: row.school_id || "",
         year: numberOrNull(row.year),
         hour: numberOrNull(row.hour),
         state_name: row.state_name,
@@ -546,11 +554,11 @@ function roadTouchesSchoolBuffer(feature, center) {
 
 function updateSchoolContextNote(crashCount, roadCount) {
   const parts = [];
-  if (crashCount !== null) parts.push(`${crashCount} fatal child-involved ${crashCount === 1 ? "crash" : "crashes"} inside the buffer`);
+  if (crashCount !== null) parts.push(`${crashCount} fatal child-involved ${crashCount === 1 ? "crash" : "crashes"} assigned to this school in the study (each crash goes to its nearest school within 2 miles, so other crashes inside the circle may belong to a nearer school). Black-outlined dots: fill is pale orange for 0 child deaths, orange for 1, dark red for 2 or more`);
   if (roadCount !== null) {
     parts.push(roadCount
       ? `${roadCount} high-crash road ${roadCount === 1 ? "segment" : "segments"} inside the buffer`
-      : "no high-crash primary-road segments inside the buffer (the road layer covers interstates and other primary roads only)");
+      : "no high-crash road corridors inside the buffer");
   }
   schoolContextNote.textContent = parts.length ? `${parts.join("; ")}.` : "";
 }
@@ -567,20 +575,24 @@ async function refreshSchoolContextOverlays() {
   if (schoolCrashesToggle.checked) {
     await loadHotspotData();
     if (!selectedSchoolFeature || selectedLayer !== "schools") return;
-    const nearbyCrashes = mapLayers.hotspots.features.filter((feature) => {
-      const [crashLongitude, crashLatitude] = feature.geometry.coordinates;
-      return map.distance(center, [crashLatitude, crashLongitude]) <= schoolBufferMeters;
-    });
+    // Study rule: each crash belongs to its single nearest school within 2 miles.
+    const schoolId = String(selectedSchoolFeature.properties.ncesid_t).split(".")[0];
+    const nearbyCrashes = mapLayers.hotspots.features.filter((feature) => feature.properties.school_id === schoolId);
     crashCount = nearbyCrashes.length;
     schoolCrashOverlay = L.layerGroup(nearbyCrashes.map((feature) => {
       const [crashLongitude, crashLatitude] = feature.geometry.coordinates;
+      // Same orange-red scale as the rest of the atlas (by child deaths in the
+      // crash), with a thick black outline so study crashes stand out from
+      // schools, roads and the basemap.
+      const deaths = numberOrZero(feature.properties.child_deaths);
+      const fill = deaths >= 2 ? fillPalette[4] : deaths === 1 ? fillPalette[3] : fillPalette[1];
       return L.circleMarker([crashLatitude, crashLongitude], {
         pane: "contextPane",
-        radius: 6,
-        color: "#ffffff",
-        weight: 1.5,
-        fillColor: "#d7301f",
-        fillOpacity: 0.88,
+        radius: 7,
+        color: "#000000",
+        weight: 2.5,
+        fillColor: fill,
+        fillOpacity: 0.95,
       }).bindPopup(() => popupContent(`Crash ${feature.properties.crash_id}`, [
         ["Year", feature.properties.year],
         ["Child fatalities", feature.properties.child_deaths],
@@ -757,6 +769,9 @@ function showSchool(feature) {
   const popup = popupContent(properties.school_name, [
     ["NCES ID", properties.ncesid_t],
     ["Study buffer", `${schoolBufferMiles} miles`],
+    ["Study fatal crashes (nearest school)", properties.study_crashes],
+    ["Study child fatalities", properties.study_child_deaths],
+    ["Study pedestrian / cyclist deaths", properties.study_ped_deaths],
     ["County FIPS", properties.county_fips],
     ["Address ZIP", properties.zip_code || "Not available"],
     [measureSettings[selectedMeasure].label, formatValue(selectedValue, selectedMeasure)],
@@ -831,12 +846,20 @@ map.on("click", (event) => {
 
 function makeTractPopup(feature) {
   const properties = feature.properties;
+  if (!tractDataById.has(properties.geoid)) {
+    return popupContent(`Census tract ${properties.name || properties.geoid}`, [
+      ["GEOID", properties.geoid],
+      ["Status", "Not in the manuscript's Figure 2 data (no Street View indicators or population)"],
+      ["Note", "Unavailable, as in the manuscript's Figure 2. Gray does not mean zero crashes."],
+    ]);
+  }
   return popupContent(`Census tract ${properties.name || properties.geoid}`, [
     ["GEOID", properties.geoid],
     ["Child-involved fatal crashes", formatValue(properties.child_crashes, "child_crashes")],
     ["Child fatalities", formatValue(properties.child_deaths, "child_deaths")],
     ["Pedestrian / cyclist deaths", formatValue(properties.ped_cyclist_deaths, "ped_cyclist_deaths")],
     ["Crashes per 10,000 children", formatValue(properties.child_crash_rate, "child_crash_rate")],
+    ["In manuscript regression sample", properties.in_sample ? "Yes" : "No (e.g. missing traffic-volume data)"],
   ]);
 }
 
@@ -886,7 +909,7 @@ function visibleStateIds() {
 async function ensureTractState(stateFips) {
   if (tractStateLayers.has(stateFips)) return tractStateLayers.get(stateFips);
   if (tractStateRequests.has(stateFips)) return tractStateRequests.get(stateFips);
-  const request = fetch(`data/tracts/${stateFips}.geojson`)
+  const request = fetch(`data/tract-shapes/state-${stateFips}.geojson`)
     .then((response) => {
       if (!response.ok) throw new Error(`Tract geometry request failed (${response.status}).`);
       return response.json();
@@ -937,10 +960,16 @@ async function updateVisibleTracts() {
   syncCountyDisplay();
 }
 
+const roadClassNames = {
+  S1100: "Primary road", S1200: "Secondary road", S1400: "Local street", S1500: "Four-wheel-drive trail",
+  S1630: "Ramp", S1640: "Service drive", S1710: "Walkway", S1720: "Stairway", S1730: "Alley",
+  S1740: "Private road", S1750: "Internal census road", S1780: "Parking lot road", S1820: "Bike path", S1830: "Bridle path",
+};
+
 function makeRoadPopup(feature) {
   const properties = feature.properties;
-  return popupContent(properties.name || "Unnamed primary road", [
-    ["Road class", properties.road_class === "S1100" ? "Primary road" : properties.road_class],
+  return popupContent(properties.name || "Unnamed road", [
+    ["Road class", roadClassNames[properties.road_class] || properties.road_class || "Road"],
     ["Segment length", `${Number(properties.length_miles || 0).toFixed(1)} miles`],
     ["Matched fatal crashes", formatValue(properties.child_crashes, "child_crashes")],
     ["Crashes per road mile", formatValue(properties.crashes_per_mile, "crashes_per_mile")],
@@ -989,7 +1018,7 @@ function syncRoadDisplay() {
 
 function countyStyle(feature) {
   const measureKey = measureSelect.value;
-  const supportsMeasure = outcomeKeys.includes(measureKey);
+  const supportsMeasure = layerMeasures.tracts.includes(measureKey);
   const value = supportsMeasure ? getValue(feature, measureKey) : null;
   return {
     color: "#ffffff",
@@ -1047,7 +1076,7 @@ function setNationalTooltip(feature, event) {
   const measureKey = measureSelect.value;
   if (selectedLayer === "roads" || selectedLayer === "schools") {
     detail.textContent = selectedLayer === "roads"
-      ? "Select this county to inspect major-road corridors."
+      ? "Select this county to inspect road corridors."
       : "Select this county to inspect individual schools.";
   } else {
     const value = overviewCountyValues.get(feature.properties.county_fips);
@@ -1156,7 +1185,10 @@ function renderNationalOverview() {
     svg.append("g")
       .attr("class", "road-layer")
       .selectAll("path")
-      .data(mapLayers.roads.features.filter((feature) => numberOrZero(feature.properties.child_crashes) > 0 && path(feature)))
+      // With every road class loaded, the national map draws only primary/secondary roads and corridors with 2+ crashes to stay fast.
+      .data(mapLayers.roads.features.filter((feature) => numberOrZero(feature.properties.child_crashes) > 0
+        && (numberOrZero(feature.properties.child_crashes) >= 2 || ["S1100", "S1200"].includes(feature.properties.road_class))
+        && path(feature)))
       .join("path")
       .attr("class", "road-corridor")
       .attr("d", path)
@@ -1261,7 +1293,7 @@ function renderNationalOverview() {
   const promptText = {
     tracts: "Select a county to explore census tracts",
     hotspots: "Select a county to explore crash density",
-    roads: "Select a county to inspect major-road corridors",
+    roads: "Select a county to inspect road corridors",
     schools: "Select a county to explore schools and buffers",
   };
   nationalOverviewPrompt.textContent = promptText[selectedLayer];
@@ -1285,7 +1317,7 @@ function syncCountyDisplay() {
       overviewCountText = `${filteredHotspotFeatures().length.toLocaleString()} crash locations · aggregated by county`;
     } else if (selectedLayer === "roads") {
       const highCrashRoads = filteredRoadFeatures().filter((feature) => numberOrZero(feature.properties.child_crashes) > 0);
-      overviewCountText = `${highCrashRoads.length.toLocaleString()} high-crash major-road segments`;
+      overviewCountText = `${highCrashRoads.length.toLocaleString()} high-crash road corridors`;
     } else {
       const schools = filteredSchoolFeatures();
       const uniqueSchools = new Set(schools.map((feature) => feature.properties.ncesid_t)).size;
@@ -1358,7 +1390,7 @@ function updateSummary(features) {
   const totals = Object.fromEntries(outcomeKeys.map((key) => [key, 0]));
   features.forEach((feature) => outcomeKeys.forEach((key) => { totals[key] += getValue(feature, key) || 0; }));
   const units = selectedLayer === "roads"
-    ? ["matched to primary roads", "matched to primary roads", "matched to primary roads"]
+    ? ["matched to roads", "matched to roads", "matched to roads"]
     : ["mapped records", "mapped records", "child deaths"];
   setSummary(
     ["Child-involved crashes", "Child fatalities", "Pedestrian / cyclist"],
@@ -1390,7 +1422,7 @@ function layerUiText() {
   const measureNotes = {
     hotspots: "Crash outcomes across 2017–2023",
     tracts: "Counts and rates across 2017–2023",
-    roads: "Crashes matched to primary roads · 2017–2023",
+    roads: "Crashes matched to roads · 2017–2023",
     schools: "Built-environment indicators from sampled images",
   };
   document.getElementById("measure-note").textContent = measureNotes[selectedLayer];
@@ -1479,7 +1511,7 @@ function renderLayer() {
 }
 
 async function loadTractData() {
-  const response = await fetch("data/census-tracts.min.csv");
+  const response = await fetch("data/tracts.csv");
   if (!response.ok) throw new Error(`Tract data request failed (${response.status}).`);
   const features = makeTractRecords(parseCsv(await response.text()));
   mapLayers.tracts = { type: "FeatureCollection", features };
@@ -1506,8 +1538,55 @@ async function loadCountyData() {
   }).addTo(map);
 }
 
+// County values for the tract tab come from the manuscript's tract sample, so the
+// national county view matches the tract layer and the summary totals. Rates are
+// county deaths per 10,000 children in the sampled tracts; tertiles are the mean
+// tract tertile. Counties with no sampled tracts stay gray ("No analysis data").
+function applyTractSampleToCounties() {
+  const totals = new Map();
+  tractDataById.forEach((tract, geoid) => {
+    const fips = geoid.slice(0, 5);
+    const entry = totals.get(fips) || { children: 0, crashes: 0, deaths: 0, ped: 0, tracts: 0, tertiles: {} };
+    entry.children += tract.children;
+    entry.crashes += tract.child_crashes;
+    entry.deaths += tract.child_deaths;
+    entry.ped += tract.ped_cyclist_deaths;
+    entry.tracts += 1;
+    ["sidewalk_tertile", "single_lane_tertile", "stopsign_tertile", "greenness_tertile", "streetlight_tertile"].forEach((key) => {
+      if (tract[key] === null || tract[key] === undefined) return;
+      const running = entry.tertiles[key] || { sum: 0, count: 0 };
+      running.sum += tract[key];
+      running.count += 1;
+      entry.tertiles[key] = running;
+    });
+    totals.set(fips, entry);
+  });
+  const perTenThousand = (count, children) => (children > 0 ? (count / children) * 10000 : null);
+  mapLayers.counties.features.forEach((county) => {
+    const entry = totals.get(county.properties.county_fips);
+    const properties = county.properties;
+    const keys = [
+      "child_crashes", "child_deaths", "ped_cyclist_deaths", "child_crash_rate", "child_death_rate",
+      "ped_cyclist_death_rate", "sidewalk_tertile", "single_lane_tertile", "stopsign_tertile",
+      "greenness_tertile", "streetlight_tertile",
+    ];
+    if (!entry) {
+      keys.forEach((key) => { properties[key] = null; });
+      return;
+    }
+    properties.child_crashes = entry.crashes;
+    properties.child_deaths = entry.deaths;
+    properties.ped_cyclist_deaths = entry.ped;
+    properties.child_crash_rate = perTenThousand(entry.crashes, entry.children);
+    properties.child_death_rate = perTenThousand(entry.deaths, entry.children);
+    properties.ped_cyclist_death_rate = perTenThousand(entry.ped, entry.children);
+    Object.entries(entry.tertiles).forEach(([key, { sum, count }]) => { properties[key] = sum / count; });
+  });
+  activeCountyDomain = measureDomain(mapLayers.counties.features, measureSelect.value);
+}
+
 async function loadStateIndex() {
-  const response = await fetch("data/state-index.json");
+  const response = await fetch("data/state-bounds.json");
   if (!response.ok) throw new Error(`State index request failed (${response.status}).`);
   stateIndex = await response.json();
 }
@@ -1529,21 +1608,21 @@ function loadOnce(loader) {
 
 const loadSchoolData = loadOnce(async () => {
   if (mapLayers.schools) return;
-  const response = await fetch("data/schools-enhanced.min.csv");
+  const response = await fetch("data/schools.csv");
   if (!response.ok) throw new Error(`School data request failed (${response.status}).`);
   mapLayers.schools = { type: "FeatureCollection", features: makeSchoolFeatures(parseCsv(await response.text())) };
 });
 
 const loadHotspotData = loadOnce(async () => {
   if (mapLayers.hotspots) return;
-  const response = await fetch("data/child-crashes.min.csv");
+  const response = await fetch("data/crashes.csv");
   if (!response.ok) throw new Error(`Crash data request failed (${response.status}).`);
   mapLayers.hotspots = { type: "FeatureCollection", features: makeCrashFeatures(parseCsv(await response.text())) };
 });
 
 const loadRoadData = loadOnce(async () => {
   if (mapLayers.roads) return;
-  const response = await fetch("data/major-road-corridors.geojson");
+  const response = await fetch("data/roads.geojson");
   if (!response.ok) throw new Error(`Road corridor request failed (${response.status}).`);
   const collection = await response.json();
   mapLayers.roads = collection;
@@ -1560,9 +1639,9 @@ const loadRoadData = loadOnce(async () => {
 // never freezes while you use the map.
 function prefetchOtherLayers() {
   const urls = [
-    "data/schools-enhanced.min.csv",
-    "data/child-crashes.min.csv",
-    "data/major-road-corridors.geojson",
+    "data/schools.csv",
+    "data/crashes.csv",
+    "data/roads.geojson",
   ];
   const run = () => urls.reduce(
     (chain, url) => chain.then(() => fetch(url)).then((response) => response.arrayBuffer()).catch(() => {}),
@@ -1733,6 +1812,7 @@ map.on("moveend zoomend resize", () => {
 async function initialize() {
   try {
     await Promise.all([loadTractData(), loadCountyData(), loadStateIndex(), loadStateBoundaries()]);
+    applyTractSampleToCounties();
     if (selectedLayer === "schools") await loadSchoolData();
     if (selectedLayer === "hotspots") await loadHotspotData();
     if (selectedLayer === "roads") await loadRoadData();

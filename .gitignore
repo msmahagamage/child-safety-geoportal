@@ -9,11 +9,7 @@ Thumbs.db
 .chrome-*/
 .edge-*/
 *-test.png
-data/tracts/.*.ndjson
+data/tract-shapes/.*.ndjson
 
-# Large full-column source CSVs: not used by the live site (it loads the
-# slim *.min.csv files). Rebuild with scripts/prepare_web_data.py.
-data/census-tracts.csv
-data/schools-enhanced.csv
-data/child-crashes.csv
-
+# Large intermediate files used only to rebuild the slim data files.
+data/build/

@@ -24,8 +24,8 @@ APP_DIR = Path(__file__).resolve().parents[1]
 WORKSPACE = APP_DIR.parent
 DATA_DIR = APP_DIR / "data"
 ROAD_PATH = WORKSPACE / "downloads" / "TIGER2026" / "primary_roads" / "tl_2026_us_primaryroads.shp"
-CRASH_PATH = DATA_DIR / "child-crashes.csv"
-OUTPUT_PATH = DATA_DIR / "major-road-corridors.geojson"
+CRASH_PATH = DATA_DIR / "build" / "crashes-full.csv"
+OUTPUT_PATH = DATA_DIR / "roads.geojson"
 METADATA_PATH = DATA_DIR / "metadata.json"
 COUNTY_PATH = DATA_DIR / "counties.geojson"
 

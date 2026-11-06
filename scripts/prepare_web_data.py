@@ -17,16 +17,14 @@ from pathlib import Path
 import zipfile
 
 import pandas as pd
-import shapefile
-from shapely.geometry import mapping, shape as shapely_shape
-from shapely.ops import unary_union
 
 
 APP_DIR = Path(__file__).resolve().parents[1]
 WORKSPACE = APP_DIR.parent
 SOURCE_DIR = WORKSPACE / "COLLISIONS INVOLVING CHILDREN" / "COLLISIONS INVOLVING CHILDREN"
 DATA_DIR = APP_DIR / "data"
-TRACT_DIR = DATA_DIR / "tracts"
+BUILD_DIR = DATA_DIR / "build"
+TRACT_DIR = DATA_DIR / "tract-shapes"
 
 ARCHIVE_PATH = SOURCE_DIR / "child_collisions_gsv_code_and_data.zip"
 TRACT_ARCHIVE_BASE = "child_collisions_gsv/data/cb_2019_us_tract_500k/cb_2019_us_tract_500k."
@@ -97,12 +95,11 @@ def build_child_crashes() -> pd.DataFrame:
     ]
     accidents = pd.read_csv(ACCIDENT_PATH, usecols=accident_columns, low_memory=False)
     crashes = accidents.merge(child_outcomes, on="CrashID", how="inner", validate="one_to_one")
-    with zipfile.ZipFile(ARCHIVE_PATH) as archive:
-        with archive.open("child_collisions_gsv/data/regression_dataframes/cetract_raw.csv") as raw:
-            tract_rows = pd.read_csv(raw, usecols=["GEOID"], dtype={"GEOID": "string"})
-    study_tract_ids = set(tract_rows["GEOID"].str.zfill(11).dropna())
+    # Keep every child-involved fatal crash with a valid location. Crashes in tracts
+    # outside the manuscript's tract sample (missing covariates / no children) stay
+    # on the crash-density, road and school views; the tract layer alone follows
+    # the manuscript's N = 63,565 sample.
     crashes["tract_id"] = pd.to_numeric(crashes["cetract"], errors="coerce").astype("Int64").astype(str).str.zfill(11)
-    crashes = crashes[crashes["tract_id"].isin(study_tract_ids)].copy()
     crashes["latitude"] = pd.to_numeric(crashes["LATITUDE"], errors="coerce")
     crashes["longitude"] = pd.to_numeric(crashes["LONGITUD"], errors="coerce")
     crashes = crashes[
@@ -132,7 +129,7 @@ def build_child_crashes() -> pd.DataFrame:
         "county_fips", "child_crashes", "child_count", "child_deaths", "ped_cyclist_deaths",
         "age_0_9", "age_10_14", "age_15_17", "tract_id",
     ]
-    crashes[columns].to_csv(DATA_DIR / "child-crashes.csv", index=False, encoding="utf-8")
+    crashes[columns].to_csv(BUILD_DIR / "crashes-full.csv", index=False, encoding="utf-8")
     print(f"  wrote {len(crashes):,} crash locations", flush=True)
     return crashes
 
@@ -153,17 +150,21 @@ def build_schools() -> int:
         "prop_sidewalk", "prop_single_lane", "avg_stopsign", "prop_green", "prop_streetlight",
         "crosswal_2", "prop_visible_wire",
     ]
-    schools[columns].to_csv(DATA_DIR / "schools-enhanced.csv", index=False, encoding="utf-8")
+    schools[columns].to_csv(BUILD_DIR / "schools-full.csv", index=False, encoding="utf-8")
     print(f"  wrote {len(schools):,} school records", flush=True)
     return len(schools)
 
 
 def tract_data_ids() -> set[str]:
-    with (DATA_DIR / "census-tracts.csv").open(encoding="utf-8-sig", newline="") as source:
+    with (DATA_DIR / "tracts.csv").open(encoding="utf-8-sig", newline="") as source:
         return {row["GEOID"].strip() for row in csv.DictReader(source)}
 
 
 def build_boundaries(crashes: pd.DataFrame) -> dict[str, object]:
+    import shapefile  # heavy mapping libraries are only needed for boundary building
+    from shapely.geometry import mapping, shape as shapely_shape
+    from shapely.ops import unary_union
+
     print("Preparing state-split tracts and county boundaries...", flush=True)
     TRACT_DIR.mkdir(parents=True, exist_ok=True)
     app_ids = tract_data_ids()
@@ -238,7 +239,7 @@ def build_boundaries(crashes: pd.DataFrame) -> dict[str, object]:
 
         for state_fips in sorted(state_counts):
             part_path = TRACT_DIR / f".{state_fips}.ndjson"
-            output_path = TRACT_DIR / f"{state_fips}.geojson"
+            output_path = TRACT_DIR / f"state-{state_fips}.geojson"
             with output_path.open("w", encoding="utf-8", newline="") as output:
                 output.write('{"type":"FeatureCollection","features":[')
                 first = True
@@ -270,7 +271,7 @@ def build_boundaries(crashes: pd.DataFrame) -> dict[str, object]:
         "type": "FeatureCollection",
         "features": county_features,
     })
-    write_json(DATA_DIR / "state-index.json", state_index)
+    write_json(DATA_DIR / "state-bounds.json", state_index)
     print(f"  wrote {sum(state_counts.values()):,} tracts across {len(state_counts)} files", flush=True)
     print(f"  wrote {len(county_features):,} county boundaries", flush=True)
     return {
@@ -288,6 +289,10 @@ def build_state_boundaries() -> int:
     independently simplified counties leave small gaps that render as broken
     internal seams at national scale.
     """
+    import shapefile
+    from shapely.geometry import mapping, shape as shapely_shape
+    from shapely.ops import unary_union
+
     state_geometries: dict[str, list] = {}
     with zipfile.ZipFile(ARCHIVE_PATH) as archive:
         reader = shapefile.Reader(
@@ -317,6 +322,7 @@ def build_state_boundaries() -> int:
 
 def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
     crashes = build_child_crashes()
     school_count = build_schools()
     boundary_metadata = build_boundaries(crashes)
