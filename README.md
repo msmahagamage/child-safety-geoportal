@@ -1,6 +1,6 @@
 # Child Traffic Safety Atlas
 
-An interactive research atlas for fatal motor-vehicle crashes involving children in the United States, 2017–2023. It accompanies the manuscript *Built Environment Factors Linked to Fatal Motor Vehicle Collisions Among US Children, 2017–2023* (Pediatrics Open Science).
+An interactive research atlas for fatal motor-vehicle crashes involving children in the United States, 2017–2023. It accompanies the published study, [*Built Environment Factors Linked to Fatal Motor Vehicle Collisions Among US Children, 2017–2023*](https://doi.org/10.1542/pedsos.2026-001526) (Pediatrics Open Science).
 
 **Live atlas: <https://msmahagamage.github.io/child-safety-geoportal/>**
 
