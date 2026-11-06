@@ -848,8 +848,7 @@ function makeTractPopup(feature) {
   if (!tractDataById.has(properties.geoid)) {
     return popupContent(`Census tract ${properties.name || properties.geoid}`, [
       ["GEOID", properties.geoid],
-      ["Status", "Not in the manuscript's Figure 2 data (no Street View indicators or population)"],
-      ["Note", "Unavailable, as in the manuscript's Figure 2. Gray does not mean zero crashes."],
+      ["Data", "No analysis data for this tract"],
     ]);
   }
   return popupContent(`Census tract ${properties.name || properties.geoid}`, [
