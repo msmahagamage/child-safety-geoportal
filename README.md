@@ -36,7 +36,7 @@ Then open <http://localhost:8765>. On Windows you can double-click `start-server
 |---|---|
 | `tracts.csv` | 69,120 tracts: counts, rates per 10,000 children, five Street View tertiles, `child_total`|
 | `crashes.csv` | 37,412 child-involved fatal crashes with a valid location, plus `school_id` (nearest school within 2 miles) |
-| `schools.csv` | 76,056 schools in the manuscript sample, with indicators and study outcomes |
+| `schools.csv` | 76,056 schools, with indicators and study outcomes |
 | `roads.geojson` | TIGER/Line road corridors with matched crash outcomes (44,996 corridors) |
 | `tract-shapes/state-XX.geojson` | State-split 2019 tract geometry |
 | `counties.geojson`, `states.geojson`, `state-bounds.json` | County shapes, state outlines, map bounds |
