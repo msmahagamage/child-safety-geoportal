@@ -1754,7 +1754,10 @@ layerButtons.forEach((button) => {
       tab.setAttribute("aria-pressed", String(active));
     });
     syncLocationControls();
-    measureSelect.value = ""; // not in the option list, so the tab's default indicator is used
+    // Start the tab on its default indicator. Rebuild the option list now so no
+    // map event fired by setView below ever sees an empty measure.
+    measureSelect.value = "";
+    syncMeasureOptions();
     map.setView(nationalView.center, nationalView.zoom, { animate: false });
     renderLayer();
     try {
