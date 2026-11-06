@@ -1,88 +1,91 @@
 # Child Traffic Safety Atlas
 
-An interactive research atlas for fatal motor-vehicle crashes involving children in the United States, 2017–2023.
+An interactive research atlas for fatal motor-vehicle crashes involving children in the United States, 2017–2023. It accompanies the manuscript *Built Environment Factors Linked to Fatal Motor Vehicle Collisions Among US Children, 2017–2023* (Pediatrics Open Science).
 
-## Included views
+**Live atlas: <https://msmahagamage.github.io/child-safety-geoportal/>**
 
-- Shared curved Albers USA national overview for every analytical layer, with Alaska and Hawaii insets
-- County-level national choropleth with persistent county boundaries
-- Filled 2019 Census tract choropleths that load by state after zooming in
-- Raw counts, rates per 10,000 children, and built-environment tertiles
-- Crash-density hexagons with year and child age-group filters
-- High-crash road corridors colored by crash count, crashes per mile, fatalities, or pedestrian/cyclist deaths
-- Clustered national school circles sized by school count and colored by the median selected indicator
-- Individual school points with a fixed two-mile study buffer, filtered-area comparisons, and optional crash/road context
-- Independent State and County filters remembered by each map layer, plus School address ZIP filtering on the Schools layer
-- Accessible Home control that restores the national map view
+It is a static website (HTML, CSS, JavaScript and data files). There is no server code and no build step.
 
-The national views are rendered with D3's composite Albers USA equal-area projection. Selecting a county opens the corresponding detailed Leaflet map, which uses Web Mercator because the Esri street basemap is tiled in that projection. All source coordinates remain WGS 84 longitude/latitude.
+## What you can explore
+
+Pick a layer in the left panel. Each layer has its own State and County filters and its own map measure; switching layers resets the previous layer's choices.
+
+- **Crash density** – hexagons of child-involved fatal crashes, with year and child age-group filters.
+- **Census tracts** – 2019 tract choropleths that load by state when you zoom in. Measures: counts, rates per 10,000 children, and Street View built-environment tertiles. Gray tracts have no analysis data (they are not zero).
+- **Road corridors** – all road classes (TIGER/Line), colored by child-involved fatal crashes, crashes per road mile, child fatalities, or child pedestrian / cyclist deaths.
+- **School buffers** – clustered national school circles; zoom in for individual schools with the study's fixed two-mile buffer, filtered-area comparisons, and optional overlays:
+  - *Crashes assigned to this school (study definition)*: black-outlined dots, filled pale orange / orange / dark red for 0 / 1 / 2+ child deaths in the crash.
+  - *High-crash roads* inside the buffer.
+
+National views use D3's Albers USA projection (Alaska and Hawaii insets). County and tract views use Leaflet in Web Mercator over an Esri street basemap. All source coordinates are WGS 84.
 
 ## Run locally
 
-The app must be served over HTTP so the browser can load its data files.
+The page must be served over HTTP so the browser can load its data files (opening `index.html` directly will not work).
 
 ```powershell
 cd child-safety-geoportal
 python serve.py 8765
 ```
 
-`serve.py` gzip-compresses the data files for much faster loading (`python -m http.server` also works, just slower). On Windows you can double-click `start-server.bat`. Then open `http://localhost:8765`.
+Then open <http://localhost:8765>. On Windows you can double-click `start-server.bat` instead. `serve.py` gzip-compresses the data for faster loading; `python -m http.server` also works, just slower. Hard-refresh (Ctrl+F5) after changing files.
 
-The app reads the files in `data/` (see `data/README.md` for what each one is). Regenerate them with:
+## Data in `data/`
+
+| File | Contents |
+|---|---|
+| `tracts.csv` | 69,120 tracts: counts, rates per 10,000 children, five Street View tertiles, `child_total`, `in_sample` flag |
+| `crashes.csv` | 37,412 child-involved fatal crashes with a valid location, plus `school_id` (nearest school within 2 miles) |
+| `schools.csv` | 76,056 schools in the manuscript sample, with indicators and study outcomes |
+| `roads.geojson` | TIGER/Line road corridors with matched crash outcomes (44,996 corridors) |
+| `tract-shapes/state-XX.geojson` | State-split 2019 tract geometry |
+| `counties.geojson`, `states.geojson`, `state-bounds.json` | County shapes, state outlines, map bounds |
+| `metadata.json` | Record counts and geography notes |
+
+See `data/README.md` for details.
+
+## How the data match the manuscript
+
+- **Tracts.** The map shows the 69,120 tracts of `cetract_standardized.csv` (the dataframe behind the manuscript's Figure 2). Each popup states whether the tract is in the final regression sample of Tables 1–2: 63,565 tracts with complete covariates, 34,446 fatal collisions, 13,979 child fatalities and 2,274 child pedestrian / cyclist fatalities.
+- **Schools.** Exactly the manuscript's school sample: public schools with a stable location, Street View indicators, a 2019 tract with complete covariates, and 2023 enrollment of at least 25 (76,058 rows, 76,056 unique IDs).
+- **Crash assignment.** Each fatal child-involved crash belongs to its single nearest school within two miles. A crash inside a school's circle that is nearer to another school is not shown for it. The manuscript's printed school totals (19,830 crashes, 7,500 child deaths, 1,701 child pedestrian / cyclist deaths) are computed before the enrollment filter, so school popups can differ slightly.
+- **Definitions.** A child is under 18. A child fatality is a child with FARS injury severity 4. A child pedestrian / cyclist death is a child death with person type 5 or 6. "Fatal collisions with children" counts crashes, so one crash can involve several children and a child may survive in a crash that killed an adult.
+- **Rates** are per 10,000 children (ACS 2015–2019 children under 18) and are a portal convenience; the manuscript models use counts with a log-children offset.
+
+## Rebuild the data (optional)
+
+Requires the study source files next to this folder and the packages in `requirements-data.txt`.
 
 ```powershell
-python scripts/prepare_tract_data.py        # tracts: manuscript sample, N = 63,565
-python scripts/select_analysis_schools.py   # schools: manuscript sample (~76,000)
-python scripts/make_slim_csv.py             # schools + crashes
+pip install -r requirements-data.txt
+python scripts/prepare_tract_data.py        # tracts
+python scripts/select_analysis_schools.py   # manuscript school sample and study outcomes
+python scripts/prepare_web_data.py          # shapes, crashes, schools (full versions in data/build/)
+python scripts/make_slim_csv.py             # slim crashes.csv and schools.csv
+python scripts/prepare_all_roads.py         # all-road corridors (needs internet; downloads county road files, several GB)
 ```
 
-**Sample matches the manuscript.** The tract layer maps the 69,120 tracts of `cetract_standardized.csv`, the model dataframe (saved 2026-01-28) that tract_regression.ipynb used to draw the manuscript's Figure 2 (`figure_2.png`, saved the next day); other tracts are unavailable (gray), as the white tracts in Figure 2. Each tract popup states whether it belongs to the final regression sample of Tables 1–2 (`cetract_raw.csv`): 63,565 tracts with complete covariates including traffic volume and children, 34,446 fatal collisions, 13,979 child fatalities and 2,274 pedestrian/cyclist child fatalities. Totals shown on the tract tab cover all 69,120 mapped tracts (36,052 crashes, 14,624 child fatalities, 2,420 pedestrian/cyclist deaths); the sample rows reproduce the manuscript exactly. The school layer keeps exactly the schools in the manuscript's school sample (public schools with a stable location, Street View indicators, a 2019 tract with complete covariates, and 2023 enrollment of at least 25): 76,058 rows, 76,056 unique school IDs. Each school's popup shows its study outcomes under the manuscript's nearest-school rule. The crash overlay plots every matching crash. The crash-density, county and school-overlay views use all 37,412 child-involved fatal crashes with a valid location (37,543 in FARS, 131 without coordinates), including about 2,900 crashes in tracts outside the manuscript's tract sample. Only the tract layer is limited to the Figure 2 tracts. The road layer currently covers primary roads only (`prepare_road_corridors.py`). To cover every road class, run `python scripts/prepare_all_roads.py` on a machine with internet access (see the script header); it downloads Census TIGER/Line county road files, matches all crashes to the nearest road within 40 m, and rewrites `data/major-road-corridors.geojson`. The school crash overlay follows the manuscript's rule: each fatal child-involved crash is assigned to its single nearest school within two miles (`fars_school_nearest_2mi.csv`), so a crash appears for one school only. Crashes inside a school's circle that are nearer to another school are not shown for it. The manuscript's printed school totals (19,830 crashes, 7,500 child deaths, 1,701 pedestrian/cyclist deaths) are computed before the enrollment filter; the popups use the final 76,058-school sample.
-
-No JavaScript build step is required.
+`prepare_road_corridors.py` is an older, lighter version that uses primary roads only. Intermediate files go to `data/build/`, which is not committed.
 
 ## Publish with GitHub Pages
 
-Push the contents of this directory as the repository root. In the GitHub repository, open **Settings → Pages**, choose **Deploy from a branch**, and publish the root of the `main` branch. The atlas uses relative data paths, so no code changes are required for a standard project site.
+Push this folder as the repository root. In the repository open **Settings → Pages**, choose **Deploy from a branch**, and select the `main` branch, root folder. Paths are relative, so no code change is needed. The `.nojekyll` file tells Pages to serve the files as-is.
 
-## Web data
-
-The repository contains browser-ready derivatives rather than the multi-gigabyte research source directory:
-
-- `data/tracts.csv` — census-tract outcomes, rates and street-view tertiles
-- `data/crashes.csv` — one row per child-involved fatal crash
-- `data/schools.csv` — schools in the manuscript sample, with indicators and study outcomes
-- `data/roads.geojson` — road corridors with matched crash outcomes (primary roads now; all road classes after running `prepare_all_roads.py`)
-- `data/tract-shapes/state-XX.geojson` — state-split 2019 tract geometry
-- `data/counties.geojson`, `data/states.geojson`, `data/state-bounds.json` — county shapes, state outlines and state map bounds
-- `data/metadata.json` — record counts and geography metadata
-
-Run the reproducible data builder from the app directory when the source study files are available in the parent workspace:
-
-```powershell
-python scripts/prepare_web_data.py
-python scripts/prepare_road_corridors.py   # primary roads only
-python scripts/prepare_all_roads.py          # all TIGER road classes (downloads county files)
-```
-
-Python data-preparation dependencies are listed in `requirements-data.txt`.
-
-## Interpretation
+## Interpretation and limits
 
 - Crash-density hexagons are a visual aggregation, not a test of statistically significant clustering.
-- The road view is a screening layer, not a complete road-safety model. The bundled layer uses 2026 TIGER/Line Primary Roads, omits local and secondary streets, and includes only crashes close enough to match conservatively; `prepare_all_roads.py` extends it to all road classes.
-- Crashes per mile adjusts for segment length but not traffic volume or vehicle miles traveled.
-- School indicators and regression results use the study's fixed two-mile Euclidean buffer. The bundled data do not contain 0.5- or 1-mile indicator estimates.
-- The School address ZIP filter uses the NCES school address; it is not a claim that the full two-mile buffer lies inside that ZIP or a Census ZCTA.
-- Gray or dashed tracts have no prepared tract analysis record and are not equivalent to zero.
-- School indicators summarize sampled street images inside the study geography; they are not school-level causal estimates.
-- The tract regression subset, coordinate-valid crash file, raw school source, and final adjusted manuscript models have different inclusion criteria. Counts are labeled by mapped layer and should not be treated as interchangeable.
+- The road layer is a screening tool, not a road-safety model. Crashes are matched to the nearest road within 40 m (98.5% matched); crashes per mile adjusts for length but not traffic volume.
+- School indicators and regression results use the study's fixed two-mile Euclidean buffer; 0.5- and 1-mile estimates are not included.
+- The school ZIP filter uses the NCES school address; it does not mean the whole buffer lies inside that ZIP.
+- School indicators summarize sampled street images; they are not school-level causal estimates.
+- The tract regression subset, coordinate-valid crash file, school sample and adjusted manuscript models have different inclusion criteria. Counts are labeled by layer and should not be treated as interchangeable.
 - Associations in the underlying study are observational and do not establish causation.
 
 ## Data sources
 
 - Fatality Analysis Reporting System (FARS), 2017–2023
-- U.S. Census Bureau 2019 cartographic boundary files
-- U.S. Census Bureau 2026 TIGER/Line Primary Roads
-- National Center for Education Statistics school locations
+- U.S. Census Bureau 2019 cartographic boundary files and ACS 2015–2019 (NHGIS)
+- U.S. Census Bureau TIGER/Line roads
+- National Center for Education Statistics Common Core of Data (school locations, enrollment)
 - Study-prepared Google Street View built-environment indicators
-
+- Basemap: Esri; map libraries: Leaflet and D3
